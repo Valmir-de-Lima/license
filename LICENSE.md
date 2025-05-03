@@ -1,6 +1,6 @@
 # Proprietary Software License
 
-Copyright © Valmir de Lima, All Rights Reserved.
+Copyright © Valmir B. Lima, All Rights Reserved.
 
 This software, including its source code, binaries, modules, and associated assets (collectively referred to as “the Software”), is proprietary and confidential. Unauthorized use, reproduction, distribution, or modification of this Software is strictly prohibited without explicit, written permission from the copyright holder.
 
