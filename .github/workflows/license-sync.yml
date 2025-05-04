@@ -5,8 +5,11 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 0 * * 1'  # Segunda-feira
+    - cron: '0 0 * * 1'  # Toda segunda-feira
   workflow_dispatch:
+
+env:
+  ACTIONS_STEP_DEBUG: true  # Ativa logs detalhados para depuração
 
 jobs:
   sync-license:
@@ -24,3 +27,4 @@ jobs:
           committer_email: noreply@github.com
           exclude_private: false
           exclude_forked: false
+          bot_branch_name: atualizacao-license-sync  # Nome da branch criada nos repositórios de destino
