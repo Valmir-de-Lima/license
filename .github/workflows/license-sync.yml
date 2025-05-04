@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Permite execução manual do workflow
+  workflow_dispatch:
 
 env:
   ACTIONS_STEP_DEBUG: true  # Ativa logs detalhados para depuração
@@ -18,11 +18,12 @@ jobs:
       - uses: derberg/manage-files-in-multiple-repositories@v2
         with:
           github_token: ${{ secrets.PERSONAL_TOKEN }}
-          patterns_to_include: "README.md, LICENSE, LICENSE.md"  # Certifique-se de que os arquivos estão devidamente listados
+          patterns_to_include: README.md, LICENSE, LICENSE.md
           topics_to_include: license-sync
           commit_message: Atualizar arquivos de licença
           committer_username: web-flow
           committer_email: noreply@github.com
           exclude_private: false
           exclude_forked: false
+          exclude_repositories: "license"  # Exclui o repositório chamado "license" especificamente
           bot_branch_name: atualizacao-license-sync  # Nome da branch criada nos repositórios de destino
