@@ -3,71 +3,74 @@
 Copyright © Valmir B. Lima  
 All rights reserved.
 
-This software — including its source code, binaries, modules, and associated assets (collectively referred to as “the Software”) — is proprietary and confidential. Any unauthorized use, reproduction, modification, or distribution is strictly prohibited without explicit written permission from the copyright holder.
+This license governs the use of all software, libraries, modules, and applications developed by **Valmir B. Lima**, unless otherwise specified.
 
----
+## 1. License Grant
 
-## 1. Ownership and Scope
+Valmir B. Lima hereby grants users a **limited, non-exclusive, non-transferable** right to use the distributed software in binary form only, under the following conditions:
 
-All intellectual property rights in the Software are exclusively owned by **Valmir B. Lima**, including but not limited to:
+- End users may access applications:
+  - Freely, with advertising integrated via third-party services; or
+  - Through a paid **annual subscription** for an ad-free experience
+- Software is provided **as-is** without warranties or guarantees
+- No access to source code is granted under this license
 
-- Core modules (e.g., `domain`, `data`, `ui`)
-- Applications developed using these modules
-- Documentation and digital assets
+## 2. Restrictions
 
-This Software is **not open source** and is **not licensed** under open licenses such as MIT, GPL, or Apache. Usage is strictly controlled and limited.
+The following actions are strictly prohibited unless explicitly authorized in writing by the author:
 
----
+- Reproduction or redistribution of the software or its parts  
+- Reverse engineering, decompilation, or modification  
+- Commercial exploitation or sublicensing  
+- Hosting copies of the software outside official distribution channels (e.g., Google Play)
 
-## 2. Distribution and Usage
+## 3. Scope
 
-The Software may only be distributed through authorized platforms, such as:
+This license applies to all software artifacts published by Valmir B. Lima, including but not limited to:
 
-- The Google Play Store
-- Approved private distribution channels
+- Android applications on Google Play  
+- Reusable Kotlin modules (`domain`, `data`, `ui`, etc.)  
+- Libraries published via GitHub Packages, Maven Central, or other registries  
+- Public and private repositories hosted on GitHub
 
-### Application Usage Models
+Unless a project includes a different license file, this license is considered the default.
 
-- **Free Tier**: Users may access apps for free by agreeing to view advertisements provided by integrated third-party services  
-- **Premium Tier**: Users may purchase an annual subscription for an ad-free experience  
+## 4. Ownership
 
-Any unauthorized redistribution or modification of binaries is prohibited.
-
----
-
-## 3. Prohibited Activities
-
-Unless otherwise permitted by a written agreement, users may **not**:
-
-- Copy, modify, or distribute source code or binaries  
-- Reverse engineer or extract source code  
-- Sub-license, repackage, or redistribute the Software  
-- Use the Software in any commercial or open-source project without permission  
-
----
-
-## 4. End User License
-
-End users are granted a **limited, non-transferable, revocable license** to use distributed apps on their personal devices, in compliance with these terms.
-
----
+All intellectual property rights remain exclusively with Valmir B. Lima. No clause in this license grants any ownership rights to the user.
 
 ## 5. Termination
 
-Any breach of these terms results in **immediate termination** of all rights to use the Software, and may result in legal action.
+This license is automatically terminated if the user violates any of its terms. Upon termination, the user must cease all usage and delete all copies of the software.
 
----
+## 6. Limitation of Liability
 
-## 6. Updates to This License
+To the fullest extent permitted by applicable law, Valmir B. Lima shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, loss of data, or business interruption, arising from the use or inability to use the software, even if advised of the possibility of such damages.
 
-These terms may be updated at any time without notice. Users are responsible for reviewing the license regularly.
+## 7. Restricted Use
 
----
+The software is licensed, not sold. The user does not acquire any ownership rights over the software, except for the limited rights of use granted by this license. All rights not expressly granted remain with Valmir B. Lima.
 
-## 7. Contact
+## 8. Mobile Platform Distribution
 
-For questions regarding licensing, commercial use, or legal concerns:
+The software may be distributed through Google Play or other mobile platforms, and the use of such platforms is subject to the specific terms and conditions of those platforms. The user agrees not to violate the policies of Google Play, including advertising, monetization, and content policies.
+
+## 9. Advertising and Subscription
+
+The software may include advertisements displayed by third-party services. The user agrees to view such advertisements while using the software. For an ad-free experience, users may opt for a **paid annual subscription**. Subscription terms, including fees and renewal, are available on the software distribution platform (e.g., Google Play).
+
+## 10. Updates and Termination
+
+This license takes effect upon installation or use of the software. The licensor may provide updates or modifications to the software but is not obligated to do so. Use of updates will be subject to the same terms as this license, unless a separate agreement applies.
+
+## 11. Jurisdiction and Governing Law
+
+This agreement will be governed by the laws of Brazil. Any dispute related to this license will be resolved by the competent courts of São Paulo, State of São Paulo, Brazil.
+
+## 12. Contact
+
+For questions, commercial licensing, or special permissions, please contact:
 
 **Valmir B. Lima**  
 📧 valmirblima@hotmail.com  
-🔗 [https://github.com/valmir-de-lima](https://github.com/valmir-de-lima)
+🔗 https://github.com/valmir-de-lima
