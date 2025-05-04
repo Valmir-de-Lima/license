@@ -25,5 +25,5 @@ jobs:
           committer_email: noreply@github.com
           exclude_private: false
           exclude_forked: false
-          exclude_repositories: "license"  # Exclui o repositório chamado "license" especificamente
+          repos_to_ignore: "license"  # Exclui o repositório chamado "license"
           bot_branch_name: atualizacao-license-sync  # Nome da branch criada nos repositórios de destino
