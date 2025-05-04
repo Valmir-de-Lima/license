@@ -1,0 +1,33 @@
+name: License Sync Debug
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  debug-token:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Verificar repositórios visíveis com o token
+        run: |
+          echo "Repositórios visíveis com o token:"
+          curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" \
+              https://api.github.com/user/repos?per_page=100 \
+            | jq '.[].full_name'
+
+      - name: Verificar informações da organização (se aplicável)
+        run: |
+          echo "Informações da organização (se aplicável):"
+          curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" \
+              https://api.github.com/user/orgs/${{ github.repository_owner }}/repos?per_page=100 \
+            | jq '.[].full_name'
+          echo "Informações do usuário:"
+          curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" \
+              https://api.github.com/user \
+            | jq '.'
