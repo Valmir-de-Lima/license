@@ -17,6 +17,7 @@ jobs:
       - uses: derberg/manage-files-in-multiple-repositories@v2
         with:
           github_token: ${{ secrets.PERSONAL_TOKEN }}
+          owner: valmir-de-lima  # 👈 Adicione isso
           patterns_to_include: README.md, LICENSE, LICENSE.md
           topics_to_include: license-sync
           commit_message: Atualizar arquivos de licença
