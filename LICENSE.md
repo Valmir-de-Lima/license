@@ -70,7 +70,6 @@ This agreement will be governed by the laws of Brazil. Any dispute related to th
 ## 12. Contact
 
 For questions, commercial licensing, or special permissions, please contact:
-
 **Valmir B. Lima**  
 📧 valmirblima@hotmail.com  
 🔗 https://github.com/valmir-de-lima
