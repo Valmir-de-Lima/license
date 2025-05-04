@@ -1,40 +1,50 @@
-# Valmir B. Lima – Proprietary License
+# 📄 Valmir B. Lima – Proprietary License
 
-This repository contains the official proprietary software license used across all modules, libraries, and applications developed by **Valmir B. Lima**.
+This repository provides the official proprietary software license used across all modules, libraries, and applications developed by **Valmir B. Lima**.
+
+---
 
 ## ⚖️ License Overview
 
-All software components created and maintained by Valmir B. Lima — including but not limited to reusable Kotlin modules, Android libraries, and full applications — are protected under the **Proprietary Software License** found in [`LICENSE.md`](./LICENSE.md).
+All software artifacts created and maintained by Valmir B. Lima — including reusable Kotlin modules, Android libraries, and complete applications — are governed by the **Proprietary Software License** outlined in [`LICENSE.md`](./LICENSE.md).
 
-This license grants **limited, non-transferable rights** to use distributed binaries, such as Android applications, under specific conditions. The license restricts source code usage, redistribution, and modification, unless explicitly authorized in writing.
+This license grants **limited, non-transferable rights** to use distributed binaries (e.g., Android applications) under specific terms. It explicitly prohibits the use, redistribution, or modification of source code unless formally authorized.
 
-## 📌 Scope
+---
 
-The license applies to:
+## 📌 Scope of Application
 
-- All private or public repositories authored by Valmir B. Lima
-- All modular components (e.g., `domain`, `data`, `ui`, etc.)
-- All published libraries (e.g., via GitHub Packages or Maven)
-- All Android apps published via Google Play or other stores
+This license applies to:
 
-Any new software project by Valmir that does not explicitly use another license should be considered as covered by this proprietary license.
+- All public and private repositories authored by Valmir B. Lima  
+- All modular components (`domain`, `data`, `ui`, etc.)  
+- All published libraries (via GitHub Packages, Maven Central, etc.)  
+- All Android applications released through Google Play or other platforms  
 
-## ✅ Usage Conditions for Apps
+If a new software project by Valmir does not explicitly define a different license, it is automatically covered by this proprietary license.
 
-End users may interact with applications under this license in two ways:
+---
 
-- **Free access**, in exchange for viewing in-app advertisements
-- **Premium access**, through an annual subscription model
+## ✅ Usage Conditions for Applications
 
-Redistribution or reverse engineering is prohibited without written consent.
+End users may use software under this license through one of the following models:
 
-## 📎 License File
+- **Free access**, with advertising provided by integrated ad services  
+- **Premium access**, via a paid annual subscription  
+
+Redistribution, reverse engineering, or modification is **strictly prohibited** without prior written consent.
+
+---
+
+## 📎 Full License Text
 
 Please read the full legal terms in [`LICENSE.md`](./LICENSE.md).
 
+---
+
 ## 📬 Contact
 
-For business inquiries, commercial licensing, or permissions:
+For licensing requests, commercial use, or legal inquiries:
 
 **Valmir B. Lima**  
 📧 [valmirblima@hotmail.com](mailto:valmirblima@hotmail.com)  
