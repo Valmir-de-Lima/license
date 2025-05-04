@@ -1,0 +1,30 @@
+name: Sync License Files
+
+on:
+  workflow_call:  # Esse é o evento para permitir que esse workflow seja chamado por outros repositórios
+
+jobs:
+  sync-license-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Sync license files
+        run: |
+          # Clonar o repositório de licença
+          git clone https://github.com/Valmir-de-Lima/license
+          
+          # Copiar os arquivos de licença para o repositório atual
+          cp license/README.md $GITHUB_WORKSPACE/
+          cp license/LICENSE $GITHUB_WORKSPACE/
+          cp license/LICENSE.md $GITHUB_WORKSPACE/
+          
+      - name: Commit and Push the updated license files
+        run: |
+          git add README.md LICENSE LICENSE.md
+          git commit -m "Updating license files"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
