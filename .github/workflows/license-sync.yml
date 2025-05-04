@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-  schedule:
-    - cron: '0 0 * * 1'  # Toda segunda-feira
-  workflow_dispatch:
+  workflow_dispatch:  # Permite execução manual do workflow
 
 env:
   ACTIONS_STEP_DEBUG: true  # Ativa logs detalhados para depuração
