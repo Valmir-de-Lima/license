@@ -5,7 +5,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 0 * * 1'  # Segunda-feira
+    - cron: '0 0 * * 1'  # Toda segunda-feira
   workflow_dispatch:
 
 jobs:
@@ -14,10 +14,22 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      # Etapa de depuração para verificar os repositórios acessíveis
+      - name: Verificar repositórios visíveis com o token
+        run: |
+          echo "Repositórios visíveis com o token:"
+          curl -s -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" \
+               https://api.github.com/user/repos?per_page=100 \
+            | jq '.[].full_name'
+
+      # Etapa principal de sincronização
       - uses: derberg/manage-files-in-multiple-repositories@v2
         with:
           github_token: ${{ secrets.PERSONAL_TOKEN }}
-          owner: valmir-de-lima  # 👈 Adicione isso
           patterns_to_include: README.md, LICENSE, LICENSE.md
           topics_to_include: license-sync
           commit_message: Atualizar arquivos de licença
+          committer_username: web-flow
+          committer_email: noreply@github.com
+          exclude_private: false
+          exclude_forked: false
