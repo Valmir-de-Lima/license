@@ -44,14 +44,12 @@ jobs:
         with:
           github-token: ${{ env.GITHUB_TOKEN }}
           script: |
-            // Módulos necessários (declarados uma única vez)
             const { promisify } = require('util');
             const sleep = promisify(setTimeout);
             const crypto = require('crypto');
             const fs = require('fs').promises;
             const path = require('path');
 
-            // Configurações
             const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
             const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
             const maxAttempts = parseInt(process.env.MAX_MERGE_ATTEMPTS);
@@ -87,7 +85,6 @@ jobs:
               }
             }
 
-            // Processamento principal
             (async () => {
               for (const repo of repos) {
                 if (repo === '${{ github.repository }}') continue;
@@ -97,7 +94,6 @@ jobs:
                 const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
 
                 try {
-                  // 1. Configuração do branch
                   const { data: repoData } = await github.rest.repos.get({ owner, repo: repoName });
                   const defaultBranch = repoData.default_branch;
 
@@ -107,6 +103,7 @@ jobs:
                       repo: repoName,
                       ref: `heads/${defaultBranch}`
                     });
+
                     await github.rest.git.createRef({
                       owner,
                       repo: repoName,
@@ -117,8 +114,8 @@ jobs:
                     if (e.status !== 422) throw e;
                   }
 
-                  // 2. Atualização de arquivos
                   let hasChanges = false;
+
                   for (const file of filesToSync) {
                     try {
                       const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
@@ -126,6 +123,7 @@ jobs:
                       const contentHash = crypto.createHash('sha1').update(localContent).digest('hex');
 
                       let needsUpdate = true;
+
                       try {
                         const { data: remoteFile } = await github.rest.repos.getContent({
                           owner,
@@ -135,14 +133,24 @@ jobs:
                         });
                         const remoteContent = Buffer.from(remoteFile.content, 'base64').toString('utf8');
                         needsUpdate = (crypto.createHash('sha1').update(remoteContent).digest('hex') !== contentHash);
-                      } catch (e) {}
+                      } catch (e) {
+                        if (e.status !== 404) throw e;
+                        console.log(`Arquivo ${file} não existe em ${repoName}, será criado.`);
+                      }
 
                       if (needsUpdate) {
-                        const { data: remoteFile } = await github.rest.repos.getContent({
-                          owner,
-                          repo: repoName,
-                          path: file
-                        });
+                        let remoteSha = undefined;
+
+                        try {
+                          const { data: remoteFile } = await github.rest.repos.getContent({
+                            owner,
+                            repo: repoName,
+                            path: file
+                          });
+                          remoteSha = remoteFile.sha;
+                        } catch (e) {
+                          if (e.status !== 404) throw e;
+                        }
 
                         await github.rest.repos.createOrUpdateFileContents({
                           owner,
@@ -150,13 +158,14 @@ jobs:
                           path: file,
                           message: `chore: Atualizar ${file} [skip ci]`,
                           content: Buffer.from(localContent).toString('base64'),
-                          sha: remoteFile.sha,
+                          sha: remoteSha,
                           branch: branchName,
                           committer: {
                             name: "License Bot",
                             email: "license-bot@users.noreply.github.com"
                           }
                         });
+
                         hasChanges = true;
                       }
                     } catch (error) {
@@ -164,7 +173,6 @@ jobs:
                     }
                   }
 
-                  // 3. Processamento do PR
                   if (hasChanges) {
                     const pr = await github.rest.pulls.create({
                       owner,
