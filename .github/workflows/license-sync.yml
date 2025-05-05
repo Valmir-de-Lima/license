@@ -44,14 +44,11 @@ jobs:
         with:
           github-token: ${{ env.GITHUB_TOKEN }}
           script: |
-            // Módulos necessários (declarados uma única vez)
             const { promisify } = require('util');
             const sleep = promisify(setTimeout);
-            const crypto = require('crypto');
             const fs = require('fs').promises;
             const path = require('path');
 
-            // Configurações
             const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
             const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
             const maxAttempts = parseInt(process.env.MAX_MERGE_ATTEMPTS);
@@ -69,9 +66,10 @@ jobs:
                 if (attempt >= maxAttempts) return false;
 
                 console.log(`Tentativa ${attempt}/${maxAttempts}: PR #${prNumber} não está pronto (estado: ${pr.mergeable_state})`);
-                
-                // Se o PR estiver em estado 'dirty' ou 'unknown', tenta forçar o merge
+
+                // Se o PR não for mergeable (conflitos), tenta forçar o merge
                 if (pr.mergeable_state === 'dirty' || pr.mergeable_state === 'unknown') {
+                  console.log('Tentando forçar o merge via squash...');
                   await github.rest.pulls.merge({
                     owner,
                     repo: repoName,
@@ -81,16 +79,14 @@ jobs:
                   return true;
                 }
 
-                // Aguarda um tempo antes de tentar novamente
                 await sleep(mergeDelay);
                 return tryMerge(owner, repoName, prNumber, attempt + 1);
               } catch (error) {
-                console.error(`Erro no merge do PR #${prNumber}:`, error.message);
+                console.error(`Erro ao tentar fazer merge do PR #${prNumber}:`, error.message);
                 return false;
               }
             }
 
-            // Processamento principal
             (async () => {
               for (const repo of repos) {
                 if (repo === '${{ github.repository }}') continue;
@@ -100,7 +96,7 @@ jobs:
                 const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
 
                 try {
-                  // 1. Configuração do branch
+                  // Cria o branch de sincronização
                   const { data: repoData } = await github.rest.repos.get({ owner, repo: repoName });
                   const defaultBranch = repoData.default_branch;
 
@@ -120,7 +116,7 @@ jobs:
                     if (e.status !== 422) throw e;
                   }
 
-                  // 2. Atualização de arquivos
+                  // Atualização dos arquivos
                   let hasChanges = false;
                   for (const file of filesToSync) {
                     try {
@@ -137,7 +133,7 @@ jobs:
                         });
                         sha = remoteFile.sha;
                       } catch (e) {
-                        // Arquivo não existe: sha ficará undefined
+                        // Arquivo não existe
                         console.warn(`Arquivo ${file} não existe em ${repoName}, será criado.`);
                       }
 
@@ -162,7 +158,7 @@ jobs:
                     }
                   }
 
-                  // 3. Processamento do PR
+                  // Criando e processando o PR
                   if (hasChanges) {
                     const pr = await github.rest.pulls.create({
                       owner,
