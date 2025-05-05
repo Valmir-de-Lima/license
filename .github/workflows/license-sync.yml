@@ -1,48 +1,77 @@
-name: Force License Sync with Pull Request
+name: Force License Sync with Auto-Merge
 
 on:
-  workflow_dispatch:  # Execução manual segura
+  workflow_dispatch:
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
   TARGET_TOPIC: "license-sync"
   FILES_TO_SYNC: '["README.md", "LICENSE", "LICENSE.md"]'
+  MAX_MERGE_ATTEMPTS: "3"  # Máximo de tentativas de merge
+  MERGE_DELAY: "10000"     # 10 segundos entre tentativas
 
 jobs:
   force-sync:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
 
     steps:
-      - name: Checkout repositório fonte
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      # ... (passos de checkout e get_repos mantidos iguais)
 
-      - name: Buscar repositórios com o tópico
-        id: get_repos
-        run: |
-          response=$(curl -s -H "Authorization: token ${{ env.GITHUB_TOKEN }}" \
-            "https://api.github.com/search/repositories?q=topic:${{ env.TARGET_TOPIC }}+user:${{ github.repository_owner }}")
-          
-          if echo "$response" | jq -e '.items' > /dev/null; then
-            repos=$(echo "$response" | jq -r '.items[].full_name' | tr '\n' ',')
-            echo "repos=${repos%,}" >> $GITHUB_OUTPUT  # Remove vírgula final
-          else
-            echo "Erro na API do GitHub:"
-            echo "$response" | jq .
-            exit 1
-          fi
-
-      - name: Sincronizar arquivos via API
+      - name: Sincronizar e Mesclar
         uses: actions/github-script@v6
         with:
           github-token: ${{ env.GITHUB_TOKEN }}
           script: |
+            const core = require('@actions/core');
+            const crypto = require('crypto');
             const fs = require('fs').promises;
             const path = require('path');
-            
+
             const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
             const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
+            const maxAttempts = parseInt(process.env.MAX_MERGE_ATTEMPTS);
+            const mergeDelay = parseInt(process.env.MERGE_DELAY);
+
+            async function tryMerge(owner, repoName, prNumber, attempt = 1) {
+              try {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner,
+                  repo: repoName,
+                  pull_number: prNumber
+                });
+
+                if (pr.merged) {
+                  console.log(`PR #${prNumber} já mesclado`);
+                  return true;
+                }
+
+                if (pr.mergeable_state === 'clean' && pr.state === 'open') {
+                  await github.rest.pulls.merge({
+                    owner,
+                    repo: repoName,
+                    pull_number: prNumber,
+                    merge_method: 'squash'
+                  });
+                  return true;
+                }
+
+                if (attempt >= maxAttempts) {
+                  core.warning(`Máximo de tentativas (${maxAttempts}) atingido para PR #${prNumber}`);
+                  return false;
+                }
+
+                console.log(`Tentativa ${attempt}/${maxAttempts}: PR não está pronto para merge (estado: ${pr.mergeable_state})`);
+                await new Promise(r => setTimeout(r, mergeDelay));
+                return tryMerge(owner, repoName, prNumber, attempt + 1);
+              } catch (error) {
+                core.error(`Erro no merge do PR #${prNumber}: ${error.message}`);
+                return false;
+              }
+            }
 
             for (const repo of repos) {
               if (repo === '${{ github.repository }}') continue;
@@ -52,11 +81,11 @@ jobs:
               const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
 
               try {
-                // 1. Obter branch padrão dinamicamente
+                // 1. Obter branch padrão
                 const { data: repoData } = await github.rest.repos.get({ owner, repo: repoName });
                 const defaultBranch = repoData.default_branch;
 
-                // 2. Criar branch (se não existir)
+                // 2. Criar branch
                 try {
                   const { data: refData } = await github.rest.git.getRef({
                     owner,
@@ -70,7 +99,7 @@ jobs:
                     sha: refData.object.sha
                   });
                 } catch (e) {
-                  if (e.status !== 422) throw e; // Ignora se branch já existe
+                  if (e.status !== 422) throw e;
                 }
 
                 // 3. Atualizar arquivos
@@ -78,30 +107,31 @@ jobs:
                 for (const file of filesToSync) {
                   try {
                     const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
-                    const content = await fs.readFile(filePath, 'utf8');
-                    const encodedContent = Buffer.from(content).toString('base64');
-
-                    // Verifica se o conteúdo atual é diferente
-                    let currentSha = null;
+                    const localContent = await fs.readFile(filePath, 'utf8');
+                    
+                    // Verificação mais robusta de mudanças
+                    let needsUpdate = true;
                     try {
-                      const { data } = await github.rest.repos.getContent({
+                      const { data: remoteFile } = await github.rest.repos.getContent({
                         owner,
                         repo: repoName,
                         path: file,
                         ref: branchName
                       });
-                      currentSha = data.sha;
-                    } catch (e) { /* Arquivo pode não existir ainda */ }
+                      const remoteContent = Buffer.from(remoteFile.content, 'base64').toString('utf8');
+                      needsUpdate = (remoteContent !== localContent);
+                    } catch (e) {
+                      needsUpdate = true;
+                    }
 
-                    if (!currentSha || currentSha !== require('crypto').createHash('sha1').update(content).digest('hex')) {
+                    if (needsUpdate) {
                       await github.rest.repos.createOrUpdateFileContents({
                         owner,
                         repo: repoName,
                         path: file,
                         message: `chore: Atualizar ${file} [skip ci]`,
-                        content: encodedContent,
+                        content: Buffer.from(localContent).toString('base64'),
                         branch: branchName,
-                        sha: currentSha,
                         committer: {
                           name: "License Bot",
                           email: "license-bot@users.noreply.github.com"
@@ -114,18 +144,26 @@ jobs:
                   }
                 }
 
-                // 4. Criar PR apenas se houver mudanças
+                // 4. Criar e mesclar PR
                 if (hasChanges) {
-                  await github.rest.pulls.create({
+                  const pr = await github.rest.pulls.create({
                     owner,
                     repo: repoName,
                     title: `📜 Atualização de licença (${today})`,
                     head: branchName,
                     base: defaultBranch,
-                    body: `## 📄 Atualização automática\n\nArquivos modificados:\n- ${filesToSync.join('\n- ')}\n\n*Atualização automática acionada pelo [GitHub Actions](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})*`
+                    body: `## Atualização automática\n\n*Arquivos modificados:*\n${filesToSync.map(f => `- ${f}`).join('\n')}`,
+                    draft: false
                   });
+
+                  const prNumber = pr.data.number;
+                  const mergeSuccess = await tryMerge(owner, repoName, prNumber);
+                  
+                  if (!mergeSuccess) {
+                    core.notice(`PR #${prNumber} não pôde ser mesclado automaticamente em ${repoName}`);
+                  }
                 } else {
-                  console.log(`Nenhuma alteração necessária em ${repoName}`);
+                  console.log(`Nenhuma mudança necessária em ${repoName}`);
                 }
 
               } catch (error) {
