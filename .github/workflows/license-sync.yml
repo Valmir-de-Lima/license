@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
       checks: read
 
     steps:
@@ -43,6 +44,7 @@ jobs:
         with:
           github-token: ${{ env.GITHUB_TOKEN }}
           script: |
+            // Módulos necessários (declarados uma única vez)
             const { promisify } = require('util');
             const sleep = promisify(setTimeout);
             const crypto = require('crypto');
@@ -136,12 +138,19 @@ jobs:
                       } catch (e) {}
 
                       if (needsUpdate) {
+                        const { data: remoteFile } = await github.rest.repos.getContent({
+                          owner,
+                          repo: repoName,
+                          path: file
+                        });
+
                         await github.rest.repos.createOrUpdateFileContents({
                           owner,
                           repo: repoName,
                           path: file,
                           message: `chore: Atualizar ${file} [skip ci]`,
                           content: Buffer.from(localContent).toString('base64'),
+                          sha: remoteFile.sha,
                           branch: branchName,
                           committer: {
                             name: "License Bot",
