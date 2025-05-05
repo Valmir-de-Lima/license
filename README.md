@@ -47,8 +47,6 @@ Please read the full legal terms in [`LICENSE.md`](./LICENSE.md).
 ## 📬 Contact
 
 For licensing requests, commercial use, or legal inquiries:
-
-
 **Valmir B. Lima**  
 
 📧 [valmirblima@hotmail.com](mailto:valmirblima@hotmail.com)  
