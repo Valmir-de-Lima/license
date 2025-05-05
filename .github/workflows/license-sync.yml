@@ -1,75 +1,136 @@
-name: Sincronizar Licenças e README
+name: Force License Sync with Push to Main
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Execução manual segura
+
+env:
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+  TARGET_TOPIC: "license-sync"
+  FILES_TO_SYNC: '["README.md", "LICENSE", "LICENSE.md"]'
 
 jobs:
-  update_files:
+  force-sync:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repositório atual
-        uses: actions/checkout@v2
 
-      - name: Sincronizar arquivos com push forçado para a branch principal (main)
+    steps:
+      - name: Checkout repositório fonte
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Buscar repositórios com o tópico
+        id: get_repos
+        run: |
+          response=$(curl -s -H "Authorization: token ${{ env.GITHUB_TOKEN }}" \
+            "https://api.github.com/search/repositories?q=topic:${{ env.TARGET_TOPIC }}+user:${{ github.repository_owner }}")
+          
+          if echo "$response" | jq -e '.items' > /dev/null; then
+            repos=$(echo "$response" | jq -r '.items[].full_name' | tr '\n' ',')
+            echo "repos=${repos%,}" >> $GITHUB_OUTPUT  # Remove vírgula final
+          else
+            echo "Erro na API do GitHub:" 
+            echo "$response" | jq .
+            exit 1
+          fi
+
+      - name: Sincronizar arquivos via API
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ env.GITHUB_TOKEN }}
           script: |
-            const { promisify } = require('util');
-            const sleep = promisify(setTimeout);
             const fs = require('fs').promises;
             const path = require('path');
+            
+            const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
+            const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
 
-            const filesToSync = ['README.md', 'LICENSE', 'LICENSE.md'];  // Lista de arquivos a sincronizar
-            const repos = ['AppTestClienteCore', 'cliente-core'];  // Lista de repositórios de destino
-            const maxAttempts = 3;  // Número máximo de tentativas
-            const pushDelay = 3000;  // Delay entre tentativas
+            for (const repo of repos) {
+              if (repo === '${{ github.repository }}') continue;
 
-            async function createOrUpdateFile(owner, repoName, branchName, filePath, content) {
+              const [owner, repoName] = repo.split('/');
               const today = new Date().toISOString().slice(0, 10);
-              const commitMessage = `chore: Atualizar arquivos de licença e README (${today})`;
+              const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
 
               try {
-                const base64Content = Buffer.from(content).toString('base64');
-                await github.rest.repos.createOrUpdateFileContents({
-                  owner,
-                  repo: repoName,
-                  path: filePath,
-                  message: commitMessage,
-                  content: base64Content,
-                  branch: branchName,  // Push direto para a branch 'main'
-                  committer: {
-                    name: "License Bot",
-                    email: "license-bot@users.noreply.github.com"
-                  }
-                });
+                // Usando a branch `main` diretamente
+                const defaultBranch = 'main';
 
-                console.log(`✅ Arquivo ${filePath} sincronizado com sucesso em ${repoName}`);
-              } catch (error) {
-                console.error(`❌ Erro ao criar/atualizar ${filePath} em ${repoName}:`, error.message);
-              }
-            }
-
-            async function processRepos() {
-              for (const repo of repos) {
-                const owner = 'valmirblima';  // Seu nome de usuário
-                const repoName = repo;
-
-                for (const file of filesToSync) {
-                  const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
-                  let fileContent = '';
-                  try {
-                    fileContent = await fs.readFile(filePath, 'utf8');
-                  } catch (err) {
-                    console.warn(`Arquivo ${file} não encontrado, será criado em ${repoName}`);
-                    // Se o arquivo não existir, crie um conteúdo padrão ou vazio
-                    fileContent = `# ${file}\n\nEste arquivo foi criado automaticamente.\n`;
-                  }
-
-                  // Criar ou atualizar o arquivo
-                  await createOrUpdateFile(owner, repoName, 'main', file, fileContent);
+                // 1. Criar branch temporária (se não existir)
+                try {
+                  const { data: refData } = await github.rest.git.getRef({
+                    owner,
+                    repo: repoName,
+                    ref: `heads/${defaultBranch}`
+                  });
+                  await github.rest.git.createRef({
+                    owner,
+                    repo: repoName,
+                    ref: `refs/heads/${branchName}`,
+                    sha: refData.object.sha
+                  });
+                } catch (e) {
+                  if (e.status !== 422) throw e; // Ignora se branch já existe
                 }
+
+                // 2. Atualizar os arquivos
+                let hasChanges = false;
+                for (const file of filesToSync) {
+                  try {
+                    const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
+                    const content = await fs.readFile(filePath, 'utf8');
+                    const encodedContent = Buffer.from(content).toString('base64');
+
+                    // Verifica se o conteúdo atual é diferente
+                    let currentSha = null;
+                    try {
+                      const { data } = await github.rest.repos.getContent({
+                        owner,
+                        repo: repoName,
+                        path: file,
+                        ref: branchName
+                      });
+                      currentSha = data.sha;
+                    } catch (e) { /* Arquivo pode não existir ainda */ }
+
+                    if (!currentSha || currentSha !== require('crypto').createHash('sha1').update(content).digest('hex')) {
+                      await github.rest.repos.createOrUpdateFileContents({
+                        owner,
+                        repo: repoName,
+                        path: file,
+                        message: `chore: Atualizar ${file} [skip ci]`,
+                        content: encodedContent,
+                        branch: defaultBranch, // Push direto para a branch `main`
+                        sha: currentSha,
+                        committer: {
+                          name: "License Bot",
+                          email: "license-bot@users.noreply.github.com"
+                        }
+                      });
+                      hasChanges = true;
+                    }
+                  } catch (error) {
+                    core.warning(`Falha em ${file}@${repoName}: ${error.message}`);
+                  }
+                }
+
+                // 3. Forçar o push para a branch `main` se houver mudanças
+                if (hasChanges) {
+                  console.log(`Alterações detectadas em ${repoName}. Forçando push na branch main.`);
+
+                  // Push direto na branch `main`
+                  await github.rest.git.updateRef({
+                    owner,
+                    repo: repoName,
+                    ref: `heads/${defaultBranch}`,
+                    sha: sha // Usar sha final da alteração
+                  });
+
+                  console.log(`Push forçado para a branch ${defaultBranch} em ${repoName}`);
+                } else {
+                  console.log(`Nenhuma alteração necessária em ${repoName}`);
+                }
+
+              } catch (error) {
+                core.error(`Erro crítico em ${repoName}: ${error.message}`);
               }
             }
-
-            processRepos();
