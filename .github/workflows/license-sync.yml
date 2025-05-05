@@ -87,6 +87,37 @@ jobs:
               }
             }
 
+            async function createPR(owner, repoName, branchName, filesToSync) {
+              const today = new Date().toISOString().slice(0, 10);
+              const prTitle = `📜 Atualização de licença (${today})`;
+
+              // Verificando se já existe um PR com o mesmo nome
+              const existingPRs = await github.rest.pulls.list({
+                owner,
+                repo: repoName,
+                state: 'open',
+              });
+
+              const existingPR = existingPRs.data.find(pr => pr.title === prTitle);
+              if (existingPR) {
+                console.log(`PR com título '${prTitle}' já existe. Usando PR existente.`);
+                return existingPR.number;
+              }
+
+              // Se não houver PR existente, cria um novo
+              const pr = await github.rest.pulls.create({
+                owner,
+                repo: repoName,
+                title: prTitle,
+                head: branchName,
+                base: 'main',
+                body: `## Atualização automática\n\n*Arquivos modificados:*\n${filesToSync.map(f => `- ${f}`).join('\n')}`,
+                draft: false
+              });
+
+              return pr.data.number;
+            }
+
             (async () => {
               for (const repo of repos) {
                 if (repo === '${{ github.repository }}') continue;
@@ -160,17 +191,8 @@ jobs:
 
                   // Criando e processando o PR
                   if (hasChanges) {
-                    const pr = await github.rest.pulls.create({
-                      owner,
-                      repo: repoName,
-                      title: `📜 Atualização de licença (${today})`,
-                      head: branchName,
-                      base: defaultBranch,
-                      body: `## Atualização automática\n\n*Arquivos modificados:*\n${filesToSync.map(f => `- ${f}`).join('\n')}`,
-                      draft: false
-                    });
-
-                    const mergeSuccess = await tryMerge(owner, repoName, pr.data.number);
+                    const prNumber = await createPR(owner, repoName, branchName, filesToSync);
+                    const mergeSuccess = await tryMerge(owner, repoName, prNumber);
                     console.log(mergeSuccess ? 'Merge realizado' : 'Merge não realizado');
                   }
                 } catch (error) {
