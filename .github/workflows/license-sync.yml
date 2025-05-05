@@ -56,6 +56,7 @@ jobs:
                 const defaultBranch = 'main';
 
                 // 1. Criar branch temporária (se não existir)
+                let sha;
                 try {
                   const { data: refData } = await github.rest.git.getRef({
                     owner,
@@ -68,8 +69,16 @@ jobs:
                     ref: `refs/heads/${branchName}`,
                     sha: refData.object.sha
                   });
+                  sha = refData.object.sha; // Salvando o SHA da branch principal
                 } catch (e) {
                   if (e.status !== 422) throw e; // Ignora se branch já existe
+                  // Se a branch já existir, pegamos o sha da última commit da branch
+                  const { data: refData } = await github.rest.git.getRef({
+                    owner,
+                    repo: repoName,
+                    ref: `heads/${branchName}`
+                  });
+                  sha = refData.object.sha;
                 }
 
                 // 2. Atualizar os arquivos
@@ -93,13 +102,13 @@ jobs:
                     } catch (e) { /* Arquivo pode não existir ainda */ }
 
                     if (!currentSha || currentSha !== require('crypto').createHash('sha1').update(content).digest('hex')) {
-                      await github.rest.repos.createOrUpdateFileContents({
+                      const updateResponse = await github.rest.repos.createOrUpdateFileContents({
                         owner,
                         repo: repoName,
                         path: file,
                         message: `chore: Atualizar ${file} [skip ci]`,
                         content: encodedContent,
-                        branch: defaultBranch, // Push direto para a branch `main`
+                        branch: branchName,
                         sha: currentSha,
                         committer: {
                           name: "License Bot",
@@ -107,6 +116,7 @@ jobs:
                         }
                       });
                       hasChanges = true;
+                      sha = updateResponse.data.commit.sha; // Atualizando o sha com o novo commit
                     }
                   } catch (error) {
                     core.warning(`Falha em ${file}@${repoName}: ${error.message}`);
@@ -122,7 +132,7 @@ jobs:
                     owner,
                     repo: repoName,
                     ref: `heads/${defaultBranch}`,
-                    sha: sha // Usar sha final da alteração
+                    sha: sha // Usando o sha atualizado
                   });
 
                   console.log(`Push forçado para a branch ${defaultBranch} em ${repoName}`);
