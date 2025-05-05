@@ -59,7 +59,7 @@ The software may be distributed through Google Play or other mobile platforms, a
 
 The software may include advertisements displayed by third-party services. The user agrees to view such advertisements while using the software. For an ad-free experience, users may opt for a **paid annual subscription**. Subscription terms, including fees and renewal, are available on the software distribution platform (e.g., Google Play).
 
-## 10. Update
+## 10. Updates
 
 The Licensor may provide updates or modifications to the Software, but is under no obligation to do so. Any updates provided shall be subject to the same terms as this License, unless a separate agreement applies to such updates.
 
