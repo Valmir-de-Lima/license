@@ -1,58 +1,134 @@
-name: License Sync
+name: Force License Sync with Pull Request
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_dispatch:  # Execução manual segura
 
 env:
-  ACTIONS_STEP_DEBUG: true  # Ativa logs detalhados para depuração
+  GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+  TARGET_TOPIC: "license-sync"
+  FILES_TO_SYNC: '["README.md", "LICENSE", "LICENSE.md"]'
 
 jobs:
-  sync-license:
+  force-sync:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
-
-      # Etapa para copiar o README.md
-      - uses: derberg/manage-files-in-multiple-repositories@v2
+      - name: Checkout repositório fonte
+        uses: actions/checkout@v4
         with:
-          github_token: ${{ secrets.PERSONAL_TOKEN }}
-          patterns_to_include: README.md
-          topics_to_include: license-sync
-          commit_message: Atualizar arquivo README.md
-          committer_username: web-flow
-          committer_email: noreply@github.com
-          exclude_private: false
-          exclude_forked: false
-          repos_to_ignore: "license"  # Exclui o repositório chamado "license"
-          bot_branch_name: atualizacao-license-sync
+          fetch-depth: 1
 
-      # Etapa para copiar o LICENSE
-      - uses: derberg/manage-files-in-multiple-repositories@v2
-        with:
-          github_token: ${{ secrets.PERSONAL_TOKEN }}
-          patterns_to_include: LICENSE
-          topics_to_include: license-sync
-          commit_message: Atualizar arquivo LICENSE
-          committer_username: web-flow
-          committer_email: noreply@github.com
-          exclude_private: false
-          exclude_forked: false
-          repos_to_ignore: "license"  # Exclui o repositório chamado "license"
-          bot_branch_name: atualizacao-license-sync
+      - name: Buscar repositórios com o tópico
+        id: get_repos
+        run: |
+          response=$(curl -s -H "Authorization: token ${{ env.GITHUB_TOKEN }}" \
+            "https://api.github.com/search/repositories?q=topic:${{ env.TARGET_TOPIC }}+user:${{ github.repository_owner }}")
+          
+          if echo "$response" | jq -e '.items' > /dev/null; then
+            repos=$(echo "$response" | jq -r '.items[].full_name' | tr '\n' ',')
+            echo "repos=${repos%,}" >> $GITHUB_OUTPUT  # Remove vírgula final
+          else
+            echo "Erro na API do GitHub:"
+            echo "$response" | jq .
+            exit 1
+          fi
 
-      # Etapa para copiar o LICENSE.md
-      - uses: derberg/manage-files-in-multiple-repositories@v2
+      - name: Sincronizar arquivos via API
+        uses: actions/github-script@v6
         with:
-          github_token: ${{ secrets.PERSONAL_TOKEN }}
-          patterns_to_include: LICENSE.md
-          topics_to_include: license-sync
-          commit_message: Atualizar arquivo LICENSE.md
-          committer_username: web-flow
-          committer_email: noreply@github.com
-          exclude_private: false
-          exclude_forked: false
-          repos_to_ignore: "license"  # Exclui o repositório chamado "license"
-          bot_branch_name: atualizacao-license-sync
+          github-token: ${{ env.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs').promises;
+            const path = require('path');
+            
+            const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
+            const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
+
+            for (const repo of repos) {
+              if (repo === '${{ github.repository }}') continue;
+
+              const [owner, repoName] = repo.split('/');
+              const today = new Date().toISOString().slice(0, 10);
+              const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
+
+              try {
+                // 1. Obter branch padrão dinamicamente
+                const { data: repoData } = await github.rest.repos.get({ owner, repo: repoName });
+                const defaultBranch = repoData.default_branch;
+
+                // 2. Criar branch (se não existir)
+                try {
+                  const { data: refData } = await github.rest.git.getRef({
+                    owner,
+                    repo: repoName,
+                    ref: `heads/${defaultBranch}`
+                  });
+                  await github.rest.git.createRef({
+                    owner,
+                    repo: repoName,
+                    ref: `refs/heads/${branchName}`,
+                    sha: refData.object.sha
+                  });
+                } catch (e) {
+                  if (e.status !== 422) throw e; // Ignora se branch já existe
+                }
+
+                // 3. Atualizar arquivos
+                let hasChanges = false;
+                for (const file of filesToSync) {
+                  try {
+                    const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
+                    const content = await fs.readFile(filePath, 'utf8');
+                    const encodedContent = Buffer.from(content).toString('base64');
+
+                    // Verifica se o conteúdo atual é diferente
+                    let currentSha = null;
+                    try {
+                      const { data } = await github.rest.repos.getContent({
+                        owner,
+                        repo: repoName,
+                        path: file,
+                        ref: branchName
+                      });
+                      currentSha = data.sha;
+                    } catch (e) { /* Arquivo pode não existir ainda */ }
+
+                    if (!currentSha || currentSha !== require('crypto').createHash('sha1').update(content).digest('hex')) {
+                      await github.rest.repos.createOrUpdateFileContents({
+                        owner,
+                        repo: repoName,
+                        path: file,
+                        message: `chore: Atualizar ${file} [skip ci]`,
+                        content: encodedContent,
+                        branch: branchName,
+                        sha: currentSha,
+                        committer: {
+                          name: "License Bot",
+                          email: "license-bot@users.noreply.github.com"
+                        }
+                      });
+                      hasChanges = true;
+                    }
+                  } catch (error) {
+                    core.warning(`Falha em ${file}@${repoName}: ${error.message}`);
+                  }
+                }
+
+                // 4. Criar PR apenas se houver mudanças
+                if (hasChanges) {
+                  await github.rest.pulls.create({
+                    owner,
+                    repo: repoName,
+                    title: `📜 Atualização de licença (${today})`,
+                    head: branchName,
+                    base: defaultBranch,
+                    body: `## 📄 Atualização automática\n\nArquivos modificados:\n- ${filesToSync.map(f => \`\${f}\`).join('\n- ')}\n\n*Automatic update triggered by [GitHub Actions](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})*`
+                  });
+                } else {
+                  console.log(`Nenhuma alteração necessária em ${repoName}`);
+                }
+
+              } catch (error) {
+                core.error(`Erro crítico em ${repoName}: ${error.message}`);
+              }
+            }
