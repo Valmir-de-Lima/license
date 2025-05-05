@@ -68,7 +68,10 @@ jobs:
                 if (pr.merged) return true;
                 if (attempt >= maxAttempts) return false;
 
-                if (pr.mergeable_state === 'clean') {
+                console.log(`Tentativa ${attempt}/${maxAttempts}: PR #${prNumber} não está pronto (estado: ${pr.mergeable_state})`);
+                
+                // Se o PR estiver em estado 'dirty' ou 'unknown', tenta forçar o merge
+                if (pr.mergeable_state === 'dirty' || pr.mergeable_state === 'unknown') {
                   await github.rest.pulls.merge({
                     owner,
                     repo: repoName,
@@ -78,7 +81,7 @@ jobs:
                   return true;
                 }
 
-                console.log(`Tentativa ${attempt}/${maxAttempts}: PR #${prNumber} não está pronto (estado: ${pr.mergeable_state})`);
+                // Aguarda um tempo antes de tentar novamente
                 await sleep(mergeDelay);
                 return tryMerge(owner, repoName, prNumber, attempt + 1);
               } catch (error) {
