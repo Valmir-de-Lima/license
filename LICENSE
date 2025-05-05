@@ -65,7 +65,7 @@ This license takes effect upon installation or use of the software. The licensor
 
 ## 11. Jurisdiction and Governing Law
 
-This agreement will be governed by the laws of Brazil. Any dispute related to this license will be resolved by the competent courts of São Paulo, State of São Paulo, Brazil.
+This agreement will be governed by the laws of Brazil. Any dispute related to this license will be resolved by the competent courts of Maceió, State of Alagoas, Brazil.
 
 ## 12. Contact
 
