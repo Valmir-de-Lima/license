@@ -100,15 +100,50 @@ jobs:
                 }
               }
 
+              // Verificar se a branch existe, se não, criar uma nova a partir da main
+              try {
+                const { data: branches } = await github.rest.repos.listBranches({
+                  owner,
+                  repo: repoName
+                });
+
+                const branchExists = branches.some(branch => branch.name === branchName);
+
+                if (!branchExists) {
+                  console.log(`⛔ A branch ${branchName} não existe. Criando...`);
+                  // Criando a branch a partir da branch principal (geralmente main ou master)
+                  const { data: defaultBranch } = await github.rest.repos.get({
+                    owner,
+                    repo: repoName
+                  });
+                  const baseBranch = defaultBranch.default_branch;
+
+                  const { data: baseBranchData } = await github.rest.git.getRef({
+                    owner,
+                    repo: repoName,
+                    ref: `heads/${baseBranch}`
+                  });
+
+                  await github.rest.git.createRef({
+                    owner,
+                    repo: repoName,
+                    ref: `refs/heads/${branchName}`,
+                    sha: baseBranchData.object.sha
+                  });
+
+                  console.log(`✅ Branch ${branchName} criada em ${repoName}`);
+                }
+              } catch (error) {
+                console.error(`❌ Erro ao verificar/criar a branch em ${repoName}:`, error.message);
+              }
+
               // Realizando push direto se houver alterações
               if (hasChanges) {
-                const branchPrefix = "license-sync-bot/";
-                const uniqueBranchName = branchPrefix + branchName + "-" + Date.now();
                 try {
                   await github.rest.git.createRef({
                     owner,
                     repo: repoName,
-                    ref: `refs/heads/${uniqueBranchName}`,
+                    ref: `refs/heads/${branchName}`,
                     sha: 'latest-sha-from-source-repo', // Defina o SHA da branch base ou principal do repositório
                   });
                   console.log(`✅ Push forçado realizado para o repositório ${repoName}`);
