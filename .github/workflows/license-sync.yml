@@ -1,7 +1,7 @@
 name: Force License Sync with Push to Main
 
 on:
-  workflow_dispatch:  # Execução manual segura
+  workflow_dispatch:  # Execução manual
 
 env:
   GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repositório fonte
+      - name: Checkout do repositório fonte
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -26,121 +26,121 @@ jobs:
           
           if echo "$response" | jq -e '.items' > /dev/null; then
             repos=$(echo "$response" | jq -r '.items[].full_name' | tr '\n' ',')
-            echo "repos=${repos%,}" >> $GITHUB_OUTPUT  # Remove vírgula final
+            echo "repos=${repos%,}" >> $GITHUB_OUTPUT
           else
-            echo "Erro na API do GitHub:" 
+            echo "Erro na API do GitHub:"
             echo "$response" | jq .
             exit 1
           fi
 
-      - name: Sincronizar arquivos via API
+      - name: Sincronizar arquivos com push forçado
         uses: actions/github-script@v6
         with:
           github-token: ${{ env.GITHUB_TOKEN }}
           script: |
             const fs = require('fs').promises;
             const path = require('path');
-            
+            const crypto = require('crypto');
+
             const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
             const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
+            const defaultBranch = 'main';
 
             for (const repo of repos) {
               if (repo === '${{ github.repository }}') continue;
 
               const [owner, repoName] = repo.split('/');
-              const today = new Date().toISOString().slice(0, 10);
-              const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
+              console.log(`🔄 Verificando ${repoName}...`);
 
               try {
-                // Usando a branch `main` diretamente
-                const defaultBranch = 'main';
+                const { data: latestCommit } = await github.rest.repos.getCommit({
+                  owner,
+                  repo: repoName,
+                  ref: `heads/${defaultBranch}`,
+                });
 
-                // 1. Criar branch temporária (se não existir)
-                let sha;
-                try {
-                  const { data: refData } = await github.rest.git.getRef({
-                    owner,
-                    repo: repoName,
-                    ref: `heads/${defaultBranch}`
-                  });
-                  await github.rest.git.createRef({
-                    owner,
-                    repo: repoName,
-                    ref: `refs/heads/${branchName}`,
-                    sha: refData.object.sha
-                  });
-                  sha = refData.object.sha; // Salvando o SHA da branch principal
-                } catch (e) {
-                  if (e.status !== 422) throw e; // Ignora se branch já existe
-                  // Se a branch já existir, pegamos o sha da última commit da branch
-                  const { data: refData } = await github.rest.git.getRef({
-                    owner,
-                    repo: repoName,
-                    ref: `heads/${branchName}`
-                  });
-                  sha = refData.object.sha;
-                }
+                const baseTree = latestCommit.commit.tree.sha;
 
-                // 2. Atualizar os arquivos
                 let hasChanges = false;
+                const blobs = [];
+
                 for (const file of filesToSync) {
                   try {
                     const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
                     const content = await fs.readFile(filePath, 'utf8');
-                    const encodedContent = Buffer.from(content).toString('base64');
 
-                    // Verifica se o conteúdo atual é diferente
-                    let currentSha = null;
+                    // Tenta buscar conteúdo existente no repositório destino
+                    let shouldUpdate = true;
                     try {
-                      const { data } = await github.rest.repos.getContent({
+                      const { data: currentData } = await github.rest.repos.getContent({
                         owner,
                         repo: repoName,
                         path: file,
-                        ref: branchName
+                        ref: defaultBranch
                       });
-                      currentSha = data.sha;
-                    } catch (e) { /* Arquivo pode não existir ainda */ }
 
-                    if (!currentSha || currentSha !== require('crypto').createHash('sha1').update(content).digest('hex')) {
-                      const updateResponse = await github.rest.repos.createOrUpdateFileContents({
+                      const currentContent = Buffer.from(currentData.content, 'base64').toString('utf-8');
+                      const hashOld = crypto.createHash('sha256').update(currentContent).digest('hex');
+                      const hashNew = crypto.createHash('sha256').update(content).digest('hex');
+                      if (hashOld === hashNew) {
+                        shouldUpdate = false;
+                      }
+                    } catch (_) {
+                      // Arquivo pode não existir ainda
+                    }
+
+                    if (shouldUpdate) {
+                      console.log(`📝 Alterações detectadas em ${file} no repositório ${repoName}.`);
+                      const blob = await github.rest.git.createBlob({
                         owner,
                         repo: repoName,
+                        content,
+                        encoding: "utf-8",
+                      });
+                      blobs.push({
                         path: file,
-                        message: `chore: Atualizar ${file} [skip ci]`,
-                        content: encodedContent,
-                        branch: branchName,
-                        sha: currentSha,
-                        committer: {
-                          name: "License Bot",
-                          email: "license-bot@users.noreply.github.com"
-                        }
+                        mode: "100644",
+                        type: "blob",
+                        sha: blob.data.sha,
                       });
                       hasChanges = true;
-                      sha = updateResponse.data.commit.sha; // Atualizando o sha com o novo commit
                     }
                   } catch (error) {
-                    core.warning(`Falha em ${file}@${repoName}: ${error.message}`);
+                    console.warn(`⚠️ Erro ao processar ${file} em ${repoName}: ${error.message}`);
                   }
                 }
 
-                // 3. Forçar o push para a branch `main` se houver mudanças
-                if (hasChanges) {
-                  console.log(`Alterações detectadas em ${repoName}. Forçando push na branch main.`);
-
-                  // Push direto na branch `main`
-                  await github.rest.git.updateRef({
-                    owner,
-                    repo: repoName,
-                    ref: `heads/${defaultBranch}`,
-                    sha: sha // Usando o sha atualizado
-                  });
-
-                  console.log(`Push forçado para a branch ${defaultBranch} em ${repoName}`);
-                } else {
-                  console.log(`Nenhuma alteração necessária em ${repoName}`);
+                if (!hasChanges) {
+                  console.log(`✅ Nenhuma alteração necessária em ${repoName}.`);
+                  continue;
                 }
 
+                const tree = await github.rest.git.createTree({
+                  owner,
+                  repo: repoName,
+                  base_tree: baseTree,
+                  tree: blobs,
+                });
+
+                const commit = await github.rest.git.createCommit({
+                  owner,
+                  repo: repoName,
+                  message: `chore: Atualização de arquivos de licença [skip ci]`,
+                  tree: tree.data.sha,
+                  parents: [latestCommit.sha],
+                });
+
+                await github.rest.git.updateRef({
+                  owner,
+                  repo: repoName,
+                  ref: `heads/${defaultBranch}`,
+                  sha: commit.data.sha,
+                  force: true,
+                });
+
+                console.log(`🚀 Push forçado concluído para ${repoName}`);
+
               } catch (error) {
-                core.error(`Erro crítico em ${repoName}: ${error.message}`);
+                core.error(`❌ Erro crítico em ${repoName}: ${error.message}`);
               }
             }
