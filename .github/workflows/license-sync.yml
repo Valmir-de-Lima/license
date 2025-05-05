@@ -122,7 +122,7 @@ jobs:
                     title: `📜 Atualização de licença (${today})`,
                     head: branchName,
                     base: defaultBranch,
-                    body: `## 📄 Atualização automática\n\nArquivos modificados:\n- ${filesToSync.map(f => \`\${f}\`).join('\n- ')}\n\n*Atualização automática acionada pelo [GitHub Actions](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})*`
+                    body: `## 📄 Atualização automática\n\nArquivos modificados:\n- ${filesToSync.join('\n- ')}\n\n*Atualização automática acionada pelo [GitHub Actions](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})*`
                   });
                 } else {
                   console.log(`Nenhuma alteração necessária em ${repoName}`);
