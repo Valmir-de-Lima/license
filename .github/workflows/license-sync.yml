@@ -102,11 +102,13 @@ jobs:
 
               // Realizando push direto se houver alterações
               if (hasChanges) {
+                const branchPrefix = "license-sync-bot/";
+                const uniqueBranchName = branchPrefix + branchName + "-" + Date.now();
                 try {
                   await github.rest.git.createRef({
                     owner,
                     repo: repoName,
-                    ref: `refs/heads/${branchName}`,
+                    ref: `refs/heads/${uniqueBranchName}`,
                     sha: 'latest-sha-from-source-repo', // Defina o SHA da branch base ou principal do repositório
                   });
                   console.log(`✅ Push forçado realizado para o repositório ${repoName}`);
@@ -122,7 +124,7 @@ jobs:
 
                 const [owner, repoName] = repo.split('/');
                 const today = new Date().toISOString().slice(0, 10);
-                const branchName = `license-sync-bot/${today.replace(/-/g, '')}`;
+                const branchName = `license-sync-bot-${today.replace(/-/g, '')}`;
 
                 try {
                   // Sincronização dos arquivos com push direto
