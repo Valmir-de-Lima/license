@@ -41,7 +41,7 @@ jobs:
                       owner,
                       repo: repoName,
                       path: file,
-                      ref: branchName
+                      ref: 'main'
                     });
                     sha = remoteFile.sha;
                   } catch (e) {
@@ -49,6 +49,7 @@ jobs:
                     console.warn(`Arquivo ${file} não existe em ${repoName}, será criado.`);
                   }
 
+                  // Cria ou atualiza o arquivo
                   await github.rest.repos.createOrUpdateFileContents({
                     owner,
                     repo: repoName,
@@ -72,11 +73,12 @@ jobs:
 
               if (hasChanges) {
                 try {
+                  // Forçar o push para a branch 'main'
                   await github.rest.git.createRef({
                     owner,
                     repo: repoName,
                     ref: `refs/heads/main`,  // Forçar push para a branch 'main'
-                    sha: 'latest-sha-from-source-repo',  // Defina o SHA da branch base ou principal
+                    sha: 'latest-sha-from-source-repo',  // Use o SHA mais recente da branch base ou principal
                   });
                   console.log(`✅ Push forçado realizado para o repositório ${repoName} na branch main`);
                 } catch (error) {
