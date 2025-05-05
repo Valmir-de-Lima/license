@@ -10,7 +10,7 @@ All software artifacts created and maintained by **Valmir B. Lima** — includin
 
 This license grants **limited, non-transferable rights** to use distributed binaries (e.g., Android applications) under specific terms. It explicitly prohibits the use, redistribution, or modification of source code unless formally authorized.  
 
-**The software may be distributed as a freemium application, with free access supported by integrated ads or with premium access available via a paid annual subscription.**
+**The software may be distributed as a freemium application, with free access supported by integrated ads, or with premium access without integrated ads, available through a paid annual subscription.**
 
 ---
 
@@ -32,7 +32,7 @@ If a new software project by Valmir does not explicitly define a different licen
 End users may use software under this license through one of the following models:
 
 - **Free access**, with advertising provided by integrated ad services  
-- **Premium access**, via a paid annual subscription  
+- **Premium access**, through a paid annual subscription, without displaying ads  
 
 Redistribution, reverse engineering, or modification is **strictly prohibited** without prior written consent from **Valmir B. Lima**.
 
