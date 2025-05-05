@@ -25,65 +25,28 @@ jobs:
             const maxAttempts = 3;  // Número máximo de tentativas
             const pushDelay = 3000;  // Delay entre tentativas
 
-            async function forcePushToMain(owner, repoName, branchName, filesToSync) {
+            async function createOrUpdateFile(owner, repoName, branchName, filePath, content) {
               const today = new Date().toISOString().slice(0, 10);
               const commitMessage = `chore: Atualizar arquivos de licença e README (${today})`;
 
-              let hasChanges = false;
-              for (const file of filesToSync) {
-                try {
-                  const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
-                  const localContent = await fs.readFile(filePath, 'utf8');
-
-                  let sha = undefined;
-                  try {
-                    const { data: remoteFile } = await github.rest.repos.getContent({
-                      owner,
-                      repo: repoName,
-                      path: file,
-                      ref: 'main'
-                    });
-                    sha = remoteFile.sha;
-                  } catch (e) {
-                    // Arquivo não existe
-                    console.warn(`Arquivo ${file} não existe em ${repoName}, será criado.`);
+              try {
+                const base64Content = Buffer.from(content).toString('base64');
+                await github.rest.repos.createOrUpdateFileContents({
+                  owner,
+                  repo: repoName,
+                  path: filePath,
+                  message: commitMessage,
+                  content: base64Content,
+                  branch: branchName,  // Push direto para a branch 'main'
+                  committer: {
+                    name: "License Bot",
+                    email: "license-bot@users.noreply.github.com"
                   }
+                });
 
-                  // Cria ou atualiza o arquivo
-                  await github.rest.repos.createOrUpdateFileContents({
-                    owner,
-                    repo: repoName,
-                    path: file,
-                    message: commitMessage,
-                    content: Buffer.from(localContent).toString('base64'),
-                    branch: 'main',  // Commit forçado na branch 'main'
-                    ...(sha ? { sha } : {}),
-                    committer: {
-                      name: "License Bot",
-                      email: "license-bot@users.noreply.github.com"
-                    }
-                  });
-
-                  hasChanges = true;
-                  console.log(`✅ Arquivo ${file} sincronizado com sucesso em ${repoName}`);
-                } catch (error) {
-                  console.warn(`❌ Falha ao sincronizar ${file}@${repoName}:`, error.message);
-                }
-              }
-
-              if (hasChanges) {
-                try {
-                  // Forçar o push para a branch 'main'
-                  await github.rest.git.createRef({
-                    owner,
-                    repo: repoName,
-                    ref: `refs/heads/main`,  // Forçar push para a branch 'main'
-                    sha: 'latest-sha-from-source-repo',  // Use o SHA mais recente da branch base ou principal
-                  });
-                  console.log(`✅ Push forçado realizado para o repositório ${repoName} na branch main`);
-                } catch (error) {
-                  console.error(`❌ Erro ao forçar o push para ${repoName}:`, error.message);
-                }
+                console.log(`✅ Arquivo ${filePath} sincronizado com sucesso em ${repoName}`);
+              } catch (error) {
+                console.error(`❌ Erro ao criar/atualizar ${filePath} em ${repoName}:`, error.message);
               }
             }
 
@@ -92,11 +55,19 @@ jobs:
                 const owner = 'valmirblima';  // Seu nome de usuário
                 const repoName = repo;
 
-                try {
-                  // Sincronização dos arquivos com push forçado para 'main'
-                  await forcePushToMain(owner, repoName, 'main', filesToSync);
-                } catch (error) {
-                  console.error(`Erro em ${repoName}:`, error.message);
+                for (const file of filesToSync) {
+                  const filePath = path.join(process.env.GITHUB_WORKSPACE, file);
+                  let fileContent = '';
+                  try {
+                    fileContent = await fs.readFile(filePath, 'utf8');
+                  } catch (err) {
+                    console.warn(`Arquivo ${file} não encontrado, será criado em ${repoName}`);
+                    // Se o arquivo não existir, crie um conteúdo padrão ou vazio
+                    fileContent = `# ${file}\n\nEste arquivo foi criado automaticamente.\n`;
+                  }
+
+                  // Criar ou atualizar o arquivo
+                  await createOrUpdateFile(owner, repoName, 'main', file, fileContent);
                 }
               }
             }
