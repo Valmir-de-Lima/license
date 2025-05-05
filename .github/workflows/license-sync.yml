@@ -1,64 +1,34 @@
-name: Forçar sincronização de licenças
+name: Sincronizar Licenças e README
 
 on:
   workflow_dispatch:
 
-env:
-  GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
-  TARGET_TOPIC: "license-sync"
-  FILES_TO_SYNC: '["README.md", "LICENSE", "LICENSE.md"]'
-  MAX_PUSH_ATTEMPTS: "3"
-  PUSH_DELAY: "10000"
-
 jobs:
-  force-sync:
+  update_files:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-      checks: read
-
     steps:
-      - name: Checkout repositório fonte
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
+      - name: Checkout repositório atual
+        uses: actions/checkout@v2
 
-      - name: Buscar repositórios com o tópico
-        id: get_repos
-        run: |
-          response=$(curl -s -H "Authorization: token ${{ env.GITHUB_TOKEN }}" \
-            "https://api.github.com/search/repositories?q=topic:${{ env.TARGET_TOPIC }}+user:${{ github.repository_owner }}")
-          
-          if echo "$response" | jq -e '.items' > /dev/null; then
-            repos=$(echo "$response" | jq -r '.items[].full_name' | tr '\n' ',')
-            echo "repos=${repos%,}" >> $GITHUB_OUTPUT
-          else
-            echo "Erro na API do GitHub:"
-            echo "$response" | jq .
-            exit 1
-          fi
-
-      - name: Sincronizar arquivos com push direto
+      - name: Sincronizar arquivos com push forçado para a branch principal (main)
         uses: actions/github-script@v6
         with:
-          github-token: ${{ env.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { promisify } = require('util');
             const sleep = promisify(setTimeout);
             const fs = require('fs').promises;
             const path = require('path');
 
-            const filesToSync = JSON.parse(process.env.FILES_TO_SYNC);
-            const repos = '${{ steps.get_repos.outputs.repos }}'.split(',').filter(Boolean);
-            const maxAttempts = parseInt(process.env.MAX_PUSH_ATTEMPTS);
-            const pushDelay = parseInt(process.env.PUSH_DELAY);
+            const filesToSync = ['README.md', 'LICENSE', 'LICENSE.md'];  // Lista de arquivos a sincronizar
+            const repos = ['AppTestClienteCore', 'cliente-core'];  // Lista de repositórios de destino
+            const maxAttempts = 3;  // Número máximo de tentativas
+            const pushDelay = 3000;  // Delay entre tentativas
 
-            async function forcePush(owner, repoName, branchName, filesToSync) {
+            async function forcePushToMain(owner, repoName, branchName, filesToSync) {
               const today = new Date().toISOString().slice(0, 10);
-              const commitMessage = `chore: Atualizar arquivos de licença (${today})`;
+              const commitMessage = `chore: Atualizar arquivos de licença e README (${today})`;
 
-              // Verificando se os arquivos foram alterados
               let hasChanges = false;
               for (const file of filesToSync) {
                 try {
@@ -85,7 +55,7 @@ jobs:
                     path: file,
                     message: commitMessage,
                     content: Buffer.from(localContent).toString('base64'),
-                    branch: branchName,
+                    branch: 'main',  // Commit forçado na branch 'main'
                     ...(sha ? { sha } : {}),
                     committer: {
                       name: "License Bot",
@@ -100,53 +70,15 @@ jobs:
                 }
               }
 
-              // Verificar se a branch existe, se não, criar uma nova a partir da main
-              try {
-                const { data: branches } = await github.rest.repos.listBranches({
-                  owner,
-                  repo: repoName
-                });
-
-                const branchExists = branches.some(branch => branch.name === branchName);
-
-                if (!branchExists) {
-                  console.log(`⛔ A branch ${branchName} não existe. Criando...`);
-                  // Criando a branch a partir da branch principal (geralmente main ou master)
-                  const { data: defaultBranch } = await github.rest.repos.get({
-                    owner,
-                    repo: repoName
-                  });
-                  const baseBranch = defaultBranch.default_branch;
-
-                  const { data: baseBranchData } = await github.rest.git.getRef({
-                    owner,
-                    repo: repoName,
-                    ref: `heads/${baseBranch}`
-                  });
-
-                  await github.rest.git.createRef({
-                    owner,
-                    repo: repoName,
-                    ref: `refs/heads/${branchName}`,
-                    sha: baseBranchData.object.sha
-                  });
-
-                  console.log(`✅ Branch ${branchName} criada em ${repoName}`);
-                }
-              } catch (error) {
-                console.error(`❌ Erro ao verificar/criar a branch em ${repoName}:`, error.message);
-              }
-
-              // Realizando push direto se houver alterações
               if (hasChanges) {
                 try {
                   await github.rest.git.createRef({
                     owner,
                     repo: repoName,
-                    ref: `refs/heads/${branchName}`,
-                    sha: 'latest-sha-from-source-repo', // Defina o SHA da branch base ou principal do repositório
+                    ref: `refs/heads/main`,  // Forçar push para a branch 'main'
+                    sha: 'latest-sha-from-source-repo',  // Defina o SHA da branch base ou principal
                   });
-                  console.log(`✅ Push forçado realizado para o repositório ${repoName}`);
+                  console.log(`✅ Push forçado realizado para o repositório ${repoName} na branch main`);
                 } catch (error) {
                   console.error(`❌ Erro ao forçar o push para ${repoName}:`, error.message);
                 }
@@ -155,15 +87,12 @@ jobs:
 
             async function processRepos() {
               for (const repo of repos) {
-                if (repo === '${{ github.repository }}') continue;
-
-                const [owner, repoName] = repo.split('/');
-                const today = new Date().toISOString().slice(0, 10);
-                const branchName = `license-sync-bot-${today.replace(/-/g, '')}`;
+                const owner = 'valmirblima';  // Seu nome de usuário
+                const repoName = repo;
 
                 try {
-                  // Sincronização dos arquivos com push direto
-                  await forcePush(owner, repoName, branchName, filesToSync);
+                  // Sincronização dos arquivos com push forçado para 'main'
+                  await forcePushToMain(owner, repoName, 'main', filesToSync);
                 } catch (error) {
                   console.error(`Erro em ${repoName}:`, error.message);
                 }
