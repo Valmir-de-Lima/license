@@ -15,15 +15,44 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      # Etapa para copiar o README.md
       - uses: derberg/manage-files-in-multiple-repositories@v2
         with:
           github_token: ${{ secrets.PERSONAL_TOKEN }}
-          patterns_to_include: README.md, LICENSE, LICENSE.md
+          patterns_to_include: README.md
           topics_to_include: license-sync
-          commit_message: Atualizar arquivos de licença
+          commit_message: Atualizar arquivo README.md
           committer_username: web-flow
           committer_email: noreply@github.com
           exclude_private: false
           exclude_forked: false
           repos_to_ignore: "license"  # Exclui o repositório chamado "license"
-          bot_branch_name: atualizacao-license-sync  # Nome da branch criada nos repositórios de destino
+          bot_branch_name: atualizacao-license-sync
+
+      # Etapa para copiar o LICENSE
+      - uses: derberg/manage-files-in-multiple-repositories@v2
+        with:
+          github_token: ${{ secrets.PERSONAL_TOKEN }}
+          patterns_to_include: LICENSE
+          topics_to_include: license-sync
+          commit_message: Atualizar arquivo LICENSE
+          committer_username: web-flow
+          committer_email: noreply@github.com
+          exclude_private: false
+          exclude_forked: false
+          repos_to_ignore: "license"  # Exclui o repositório chamado "license"
+          bot_branch_name: atualizacao-license-sync
+
+      # Etapa para copiar o LICENSE.md
+      - uses: derberg/manage-files-in-multiple-repositories@v2
+        with:
+          github_token: ${{ secrets.PERSONAL_TOKEN }}
+          patterns_to_include: LICENSE.md
+          topics_to_include: license-sync
+          commit_message: Atualizar arquivo LICENSE.md
+          committer_username: web-flow
+          committer_email: noreply@github.com
+          exclude_private: false
+          exclude_forked: false
+          repos_to_ignore: "license"  # Exclui o repositório chamado "license"
+          bot_branch_name: atualizacao-license-sync
